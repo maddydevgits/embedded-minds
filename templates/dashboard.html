@@ -24,6 +24,29 @@
         <!-- Vibration Motor Control -->
         <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
             <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Vibration Motor Control</h2>
+            
+            <!-- Intensity Control -->
+            <div class="mb-4 p-4 bg-indigo-50 rounded-lg">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="text-sm font-medium text-gray-700">Intensity</label>
+                    <div class="flex items-center gap-2">
+                        <span id="intensityValue" class="text-sm font-semibold text-indigo-600">50%</span>
+                        <button onclick="getRecommendedIntensity()" class="text-xs px-2 py-1 bg-indigo-200 hover:bg-indigo-300 text-indigo-700 rounded transition">
+                            Auto
+                        </button>
+                    </div>
+                </div>
+                <input type="range" id="intensitySlider" min="0" max="255" value="128" 
+                       oninput="updateIntensityDisplay(this.value)"
+                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Low (0)</span>
+                    <span>Medium (128)</span>
+                    <span>High (255)</span>
+                </div>
+                <p id="intensityRecommendation" class="text-xs text-gray-600 mt-2"></p>
+            </div>
+            
             <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 <button id="vibrationBtn" onclick="toggleVibration()" 
                         class="px-6 sm:px-8 py-3 sm:py-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-semibold text-base sm:text-lg w-full sm:w-auto">
@@ -89,6 +112,22 @@
             <!-- Current Sensor Readings -->
             <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
                 <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Current Readings</h2>
+                
+                <!-- Hair Health Status -->
+                <div class="mb-4 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border-2 border-indigo-200">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-700 font-semibold text-sm sm:text-base">Hair Health</span>
+                        <span id="healthStatus" class="px-3 py-1 rounded-full text-xs sm:text-sm font-bold">--</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1 bg-gray-200 rounded-full h-4 sm:h-5 overflow-hidden">
+                            <div id="healthBar" class="h-full transition-all duration-500 rounded-full" style="width: 0%; background: linear-gradient(90deg, #ef4444 0%, #f59e0b 25%, #10b981 50%, #3b82f6 75%, #8b5cf6 100%);"></div>
+                        </div>
+                        <span id="healthPercentage" class="text-xl sm:text-2xl font-bold text-indigo-600 min-w-[60px] text-right">--%</span>
+                    </div>
+                    <p id="healthMessage" class="text-xs sm:text-sm text-gray-600 mt-2"></p>
+                </div>
+                
                 <div class="space-y-3 sm:space-y-4">
                     <div class="bg-blue-50 p-3 sm:p-4 rounded-lg">
                         <div class="flex justify-between items-center">
@@ -220,6 +259,9 @@ function selectUser(role) {
     event.target.classList.remove('bg-indigo-100', 'text-indigo-700');
     event.target.classList.add('bg-indigo-600', 'text-white');
     document.getElementById('selectedUser').textContent = `Selected: ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+    
+    // Get recommended intensity for this role
+    getRecommendedIntensity();
     
     // Update status
     const statusDiv = document.getElementById('roleStatus');
@@ -424,12 +466,127 @@ function updateChart(data) {
     });
 }
 
+// Calculate hair health percentage and status
+function calculateHairHealth(data) {
+    if (!data || !data.temperature || !data.light || !data.moisture) {
+        return { percentage: 0, status: '--', message: 'No data available' };
+    }
+    
+    const temp = parseFloat(data.temperature) || 0;
+    const light = parseFloat(data.light) || 0;
+    const moisture = parseFloat(data.moisture) || 0;
+    const moistureStatus = data.moisture_status || 'normal';
+    
+    // Normalize values to 0-100 scale
+    // Temperature: Optimal range 20-30°C (score 0-100)
+    let tempScore = 100;
+    if (temp < 20) {
+        tempScore = Math.max(0, 100 - (20 - temp) * 5); // Penalize cold
+    } else if (temp > 30) {
+        tempScore = Math.max(0, 100 - (temp - 30) * 5); // Penalize hot
+    } else {
+        // Optimal range: 22-28°C gets full score
+        if (temp >= 22 && temp <= 28) {
+            tempScore = 100;
+        } else {
+            tempScore = 100 - Math.abs(temp - 25) * 10;
+        }
+    }
+    
+    // Light (Density): Higher is generally better, but normalize
+    // Assuming range 0-1000, optimal around 400-700
+    let lightScore = 0;
+    if (light > 0) {
+        if (light >= 400 && light <= 700) {
+            lightScore = 100; // Optimal density
+        } else if (light < 400) {
+            lightScore = (light / 400) * 80; // Lower density, lower score
+        } else {
+            lightScore = Math.max(60, 100 - ((light - 700) / 300) * 40); // Very dense might be too much
+        }
+    }
+    
+    // Moisture: Optimal is normal (40-60%), dry or oily is bad
+    let moistureScore = 0;
+    if (moistureStatus === 'normal') {
+        if (moisture >= 40 && moisture <= 60) {
+            moistureScore = 100; // Perfect
+        } else if (moisture >= 30 && moisture < 40) {
+            moistureScore = 80 - ((40 - moisture) * 2); // Slightly dry
+        } else if (moisture > 60 && moisture <= 70) {
+            moistureScore = 80 - ((moisture - 60) * 2); // Slightly oily
+        } else {
+            moistureScore = 60; // Still normal range but not optimal
+        }
+    } else if (moistureStatus === 'dry') {
+        moistureScore = Math.max(20, 60 - (30 - moisture) * 2); // Dry is bad
+    } else if (moistureStatus === 'oily') {
+        moistureScore = Math.max(20, 60 - (moisture - 70) * 2); // Oily is bad
+    }
+    
+    // Weighted average: Temperature 30%, Light 30%, Moisture 40%
+    const healthPercentage = Math.round(
+        (tempScore * 0.3) + (lightScore * 0.3) + (moistureScore * 0.4)
+    );
+    
+    // Determine status
+    let status, statusClass, message;
+    if (healthPercentage >= 80) {
+        status = 'Excellent';
+        statusClass = 'bg-green-500 text-white';
+        message = 'Your hair is in excellent condition!';
+    } else if (healthPercentage >= 60) {
+        status = 'Good';
+        statusClass = 'bg-blue-500 text-white';
+        message = 'Your hair health is good. Keep up the care!';
+    } else if (healthPercentage >= 40) {
+        status = 'Average';
+        statusClass = 'bg-yellow-500 text-white';
+        message = 'Hair health is average. Consider improving your hair care routine.';
+    } else {
+        status = 'Worst';
+        statusClass = 'bg-red-500 text-white';
+        message = 'Hair health needs immediate attention. Check recommendations for improvement.';
+    }
+    
+    return {
+        percentage: healthPercentage,
+        status: status,
+        statusClass: statusClass,
+        message: message,
+        scores: {
+            temperature: Math.round(tempScore),
+            light: Math.round(lightScore),
+            moisture: Math.round(moistureScore)
+        }
+    };
+}
+
+function updateHairHealth(data) {
+    const health = calculateHairHealth(data);
+    
+    // Update health bar
+    const healthBar = document.getElementById('healthBar');
+    const healthPercentage = document.getElementById('healthPercentage');
+    const healthStatus = document.getElementById('healthStatus');
+    const healthMessage = document.getElementById('healthMessage');
+    
+    healthBar.style.width = health.percentage + '%';
+    healthPercentage.textContent = health.percentage + '%';
+    healthStatus.textContent = health.status;
+    healthStatus.className = `px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${health.statusClass}`;
+    healthMessage.textContent = health.message;
+}
+
 function updateCurrentReadings(data) {
     document.getElementById('tempValue').textContent = `${(data.temperature || 0).toFixed(1)}°C`;
     document.getElementById('lightValue').textContent = (data.light || 0).toFixed(0);
     document.getElementById('moistureValue').textContent = `${(data.moisture || 0).toFixed(1)}%`;
     document.getElementById('moistureStatus').textContent = `Status: ${data.moisture_status || 'normal'}`;
     document.getElementById('combingStatus').textContent = data.ir_sensor ? 'Active' : 'Inactive';
+    
+    // Update hair health
+    updateHairHealth(data);
 }
 
 function getRecommendations() {
@@ -480,6 +637,16 @@ function getRecommendations() {
                         <h3 class="font-semibold text-indigo-800 mb-1 text-sm sm:text-base">${rec.name}</h3>
                         ${rec.type ? `<p class="text-xs text-indigo-600 mb-2">${rec.type}</p>` : ''}
                         <p class="text-xs sm:text-sm text-gray-600 mb-3">${rec.reason || ''}</p>
+                        ${rec.key_ingredients && rec.key_ingredients.length > 0 ? `
+                        <div class="mb-3">
+                            <p class="text-xs font-semibold text-gray-700 mb-1">Key Ingredients:</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${rec.key_ingredients.map(ing => 
+                                    `<span class="px-2 py-1 bg-white border border-indigo-200 text-indigo-700 text-xs rounded-full font-medium">${ing}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
                         <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" 
                            class="inline-flex items-center justify-center px-3 sm:px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm hover:shadow w-full sm:w-auto">
                             <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -494,6 +661,29 @@ function getRecommendations() {
             html += '</div>';
         } else if (data.recommendations) {
             html = `<div class="bg-indigo-50 p-4 rounded-lg"><pre class="whitespace-pre-wrap text-gray-800">${data.recommendations}</pre></div>`;
+        }
+        
+        // Display beneficial ingredients section
+        if (data.beneficial_ingredients && Array.isArray(data.beneficial_ingredients) && data.beneficial_ingredients.length > 0) {
+            html += '<div class="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">';
+            html += '<h3 class="font-semibold text-green-800 mb-3 text-base sm:text-lg flex items-center gap-2">';
+            html += '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+            html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+            html += '</svg>';
+            html += 'Beneficial Ingredients & Chemicals';
+            html += '</h3>';
+            html += '<div class="space-y-3">';
+            data.beneficial_ingredients.forEach(ing => {
+                html += `<div class="bg-white p-3 sm:p-4 rounded-lg border border-green-100 shadow-sm">
+                    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                        <h4 class="font-semibold text-green-800 text-sm sm:text-base">${ing.name || 'Unknown'}</h4>
+                        ${ing.found_in ? `<span class="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">${ing.found_in}</span>` : ''}
+                    </div>
+                    ${ing.benefit ? `<p class="text-xs sm:text-sm text-gray-700">${ing.benefit}</p>` : ''}
+                </div>`;
+            });
+            html += '</div>';
+            html += '</div>';
         }
         
         if (data.tips && Array.isArray(data.tips)) {
@@ -770,6 +960,36 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 
 // Vibration motor state
 let vibrationMotorState = false;
+let currentIntensity = 128; // Default intensity (50%)
+
+// Update intensity display
+function updateIntensityDisplay(value) {
+    currentIntensity = parseInt(value);
+    const percent = Math.round((currentIntensity / 255) * 100);
+    document.getElementById('intensityValue').textContent = percent + '%';
+}
+
+// Get recommended intensity based on role and age
+function getRecommendedIntensity() {
+    if (!selectedRole) {
+        alert('Please select a role (Mother/Father/Child) first');
+        return;
+    }
+    
+    fetch(`/api/recommend-intensity?role=${selectedRole}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.intensity !== undefined) {
+                currentIntensity = data.intensity;
+                document.getElementById('intensitySlider').value = data.intensity;
+                updateIntensityDisplay(data.intensity);
+                document.getElementById('intensityRecommendation').textContent = data.recommendation || '';
+            }
+        })
+        .catch(err => {
+            console.error('Error getting recommended intensity:', err);
+        });
+}
 
 // Generate Amazon search URL
 function generateAmazonSearchUrl(productName) {
@@ -793,7 +1013,7 @@ function toggleVibration() {
         btn.classList.remove('bg-gray-200', 'text-gray-800');
         btn.classList.add('bg-green-500', 'text-white');
         status.textContent = 'ON';
-        statusText.textContent = 'Motor is turning ON...';
+        statusText.textContent = `Motor is turning ON at ${Math.round((currentIntensity / 255) * 100)}% intensity...`;
     } else {
         btn.classList.remove('bg-green-500', 'text-white');
         btn.classList.add('bg-gray-200', 'text-gray-800');
@@ -801,20 +1021,29 @@ function toggleVibration() {
         statusText.textContent = 'Motor is turning OFF...';
     }
     
-    // Send command to ESP32
+    // Send command and intensity to ESP32
+    const payload = {
+        command: command,
+        intensity: newState ? currentIntensity : null
+    };
+    
     fetch('/api/vibration', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ command: command })
+        body: JSON.stringify(payload)
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
             vibrationMotorState = newState;
-            statusText.textContent = `Motor is ${newState ? 'ON' : 'OFF'}`;
-            console.log(`Vibration motor: ${command}`);
+            if (newState) {
+                statusText.textContent = `Motor is ON at ${Math.round((currentIntensity / 255) * 100)}% intensity`;
+            } else {
+                statusText.textContent = 'Motor is OFF';
+            }
+            console.log(`Vibration motor: ${command}, Intensity: ${currentIntensity}`);
         } else {
             // Revert UI on error
             vibrationMotorState = !newState;
@@ -847,6 +1076,9 @@ function toggleVibration() {
         console.error('Error controlling vibration motor:', err);
     });
 }
+
+// Initialize intensity slider display
+updateIntensityDisplay(128);
 
 // Load user ID on page load
 fetch('/api/user-id')

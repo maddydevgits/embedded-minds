@@ -58,18 +58,26 @@ User Role: {role} (mother/father/child){age_info}
 Please provide:
 1. 3-5 specific product recommendations (shampoo, conditioner, treatments) that are age-appropriate
 2. Brief reasoning for each recommendation, considering both sensor data and age
-3. General hair care tips based on the readings and age
+3. Key beneficial ingredients/chemicals that should be in the products (e.g., keratin, biotin, argan oil, salicylic acid, etc.)
+4. General hair care tips based on the readings and age
 
 IMPORTANT: 
 - For each product recommendation, provide a clear, searchable product name that can be used to search on Amazon.
 - Consider age-appropriate products (e.g., gentle products for children, age-specific treatments for adults)
 - Take into account that different ages may have different hair care needs
+- List specific beneficial ingredients/chemicals that address the hair concerns indicated by the sensor data
+- Explain why each ingredient is beneficial for the specific hair condition
 
 Format your response as a JSON object with:
 - "recommendations": array of objects, each with:
   - "name": clear product name (e.g., "Clarifying Shampoo for Oily Hair", "Moisturizing Conditioner")
   - "type": product type (e.g., "shampoo", "conditioner", "treatment")
   - "reason": brief explanation why this product is recommended (mention age if relevant)
+  - "key_ingredients": array of key beneficial ingredients/chemicals in this product (e.g., ["salicylic acid", "tea tree oil", "niacinamide"])
+- "beneficial_ingredients": array of objects, each with:
+  - "name": ingredient/chemical name (e.g., "Keratin", "Biotin", "Argan Oil", "Salicylic Acid")
+  - "benefit": brief explanation of why this ingredient is beneficial for the current hair condition
+  - "found_in": what type of products typically contain this (e.g., "shampoos, conditioners, treatments")
 - "tips": array of general hair care tips
 - "reasoning": brief explanation of the analysis
 
@@ -79,7 +87,20 @@ Example format:
     {{
       "name": "Clarifying Shampoo for Oily Hair",
       "type": "shampoo",
-      "reason": "Helps remove excess oil and buildup"
+      "reason": "Helps remove excess oil and buildup",
+      "key_ingredients": ["salicylic acid", "tea tree oil", "niacinamide"]
+    }}
+  ],
+  "beneficial_ingredients": [
+    {{
+      "name": "Salicylic Acid",
+      "benefit": "Helps exfoliate scalp and remove excess oil and dead skin cells",
+      "found_in": "shampoos, scalp treatments"
+    }},
+    {{
+      "name": "Tea Tree Oil",
+      "benefit": "Antimicrobial properties help control scalp oil production",
+      "found_in": "shampoos, conditioners"
     }}
   ],
   "tips": ["Wash hair every other day", "Use lukewarm water"],
@@ -90,10 +111,10 @@ Example format:
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a hair care expert providing personalized product recommendations based on sensor data."},
+                    {"role": "system", "content": "You are a hair care expert and cosmetic chemist providing personalized product recommendations and ingredient analysis based on sensor data. Always provide specific, scientifically-backed ingredient recommendations."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=800,
                 temperature=0.7
             )
             

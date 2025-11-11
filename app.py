@@ -312,34 +312,137 @@ def control_vibration():
     
     data = request.get_json()
     command = data.get('command', '').lower()
+    intensity = data.get('intensity', None)
     
     if command not in ['on', 'off', '1', '0', 'true', 'false']:
         return jsonify({'error': 'Invalid command. Must be on, off, 1, 0, true, or false'}), 400
     
     try:
         topic = app.config['MQTT_TOPIC'] + '/vibration'
-        print(f"[API] Publishing vibration command '{command}' to topic: {topic}")
         
-        # Publish vibration command to MQTT topic that ESP32 subscribes to
+        # If turning on and intensity is provided, send intensity value
+        if command in ['on', '1', 'true'] and intensity is not None:
+            try:
+                intensity_val = int(intensity)
+                if intensity_val < 0 or intensity_val > 255:
+                    return jsonify({'error': 'Intensity must be between 0 and 255'}), 400
+                payload = f"{intensity_val}"
+                print(f"[API] Publishing vibration intensity '{intensity_val}' to topic: {topic}")
+            except (ValueError, TypeError):
+                payload = command
+                print(f"[API] Publishing vibration command '{command}' to topic: {topic}")
+        else:
+            payload = command
+            print(f"[API] Publishing vibration command '{command}' to topic: {topic}")
+        
+        # Publish vibration command/intensity to MQTT topic that ESP32 subscribes to
         mqtt_publish.single(
             topic,
-            command,
+            payload,
             hostname=app.config['MQTT_BROKER'],
             port=app.config['MQTT_PORT']
         )
         
-        print(f"[API] Vibration command '{command}' successfully published to MQTT")
+        print(f"[API] Vibration command/intensity successfully published to MQTT")
         
         return jsonify({
             'success': True,
             'message': f'Vibration motor command "{command}" sent to device',
-            'command': command
+            'command': command,
+            'intensity': intensity
         })
     except Exception as e:
         print(f"[API] Error publishing vibration command: {str(e)}")
         return jsonify({
             'error': f'Failed to send vibration command to device: {str(e)}'
         }), 500
+
+@app.route('/api/recommend-intensity', methods=['GET'])
+def recommend_intensity():
+    """Get recommended vibration intensity based on role and age"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    role = request.args.get('role', '')
+    if role not in ['mother', 'father', 'child']:
+        return jsonify({'error': 'Invalid role'}), 400
+    
+    # Get age configuration
+    user_settings = mongo.db.user_settings.find_one({'user_id': session['user_id']})
+    age = None
+    if user_settings and 'ages' in user_settings:
+        age = user_settings['ages'].get(role)
+    
+    # Calculate recommended intensity based on role and age
+    recommended_intensity = calculate_recommended_intensity(role, age)
+    
+    return jsonify({
+        'intensity': recommended_intensity,
+        'role': role,
+        'age': age,
+        'recommendation': get_intensity_recommendation_text(role, age, recommended_intensity)
+    })
+
+def calculate_recommended_intensity(role, age):
+    """Calculate recommended vibration intensity (0-255) based on role and age"""
+    if role == 'child':
+        if age is None:
+            return 100  # Default for child
+        if age < 3:
+            return 60   # Very gentle for toddlers
+        elif age < 8:
+            return 80   # Gentle for young children
+        elif age < 12:
+            return 100  # Moderate for older children
+        else:
+            return 120  # Slightly higher for teenagers
+    elif role == 'mother':
+        if age is None:
+            return 150  # Default for mother
+        if age < 30:
+            return 180  # Higher for young adults
+        elif age < 50:
+            return 150  # Moderate for adults
+        else:
+            return 120  # Lower for mature adults
+    elif role == 'father':
+        if age is None:
+            return 180  # Default for father
+        if age < 30:
+            return 200  # Higher for young adults
+        elif age < 50:
+            return 180  # Moderate-high for adults
+        else:
+            return 150  # Moderate for mature adults
+    return 128  # Default medium intensity
+
+def get_intensity_recommendation_text(role, age, intensity):
+    """Get human-readable recommendation text"""
+    intensity_percent = int((intensity / 255) * 100)
+    
+    if role == 'child':
+        if age and age < 3:
+            return f"Recommended: {intensity_percent}% (Very gentle for toddler)"
+        elif age and age < 12:
+            return f"Recommended: {intensity_percent}% (Gentle for child)"
+        else:
+            return f"Recommended: {intensity_percent}% (Moderate for teenager)"
+    elif role == 'mother':
+        if age and age < 30:
+            return f"Recommended: {intensity_percent}% (Higher for young adult)"
+        elif age and age >= 50:
+            return f"Recommended: {intensity_percent}% (Moderate for mature adult)"
+        else:
+            return f"Recommended: {intensity_percent}% (Standard for adult)"
+    elif role == 'father':
+        if age and age < 30:
+            return f"Recommended: {intensity_percent}% (Higher for young adult)"
+        elif age and age >= 50:
+            return f"Recommended: {intensity_percent}% (Moderate for mature adult)"
+        else:
+            return f"Recommended: {intensity_percent}% (Standard for adult)"
+    
+    return f"Recommended: {intensity_percent}%"
 
 @app.route('/api/debug-data', methods=['GET'])
 def debug_data():

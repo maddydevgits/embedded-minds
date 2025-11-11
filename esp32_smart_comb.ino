@@ -194,19 +194,32 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     Serial.print(payloadStr);
     Serial.println("'");
     
+    // Check if payload is a number (intensity value 0-255)
+    int intensityValue = payloadStr.toInt();
+    
     if (payloadStr == "on" || payloadStr == "1" || payloadStr == "true") {
       vibrationMotorOn = true;
       ledcWrite(0, 255);  // Set PWM to maximum (255 = 100% duty cycle)
-      Serial.println("✓ Vibration motor: ON");
+      Serial.println("✓ Vibration motor: ON (100%)");
     } else if (payloadStr == "off" || payloadStr == "0" || payloadStr == "false") {
       vibrationMotorOn = false;
       ledcWrite(0, 0);  // Set PWM to 0 (motor off)
       Serial.println("✓ Vibration motor: OFF");
+    } else if (intensityValue > 0 && intensityValue <= 255) {
+      // Valid intensity value received
+      vibrationMotorOn = true;
+      ledcWrite(0, intensityValue);  // Set PWM to specified intensity
+      float percent = (intensityValue / 255.0) * 100.0;
+      Serial.print("✓ Vibration motor: ON at ");
+      Serial.print(percent);
+      Serial.print("% (intensity: ");
+      Serial.print(intensityValue);
+      Serial.println(")");
     } else {
       Serial.print("✗ Invalid vibration command: '");
       Serial.print(payloadStr);
       Serial.println("'");
-      Serial.println("Expected: on, off, 1, 0, true, or false");
+      Serial.println("Expected: on, off, 1, 0, true, false, or intensity value (0-255)");
     }
   } else {
     Serial.print("Unknown topic: ");
