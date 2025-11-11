@@ -12,8 +12,8 @@ class OpenAIService:
         except:
             pass
     
-    def get_recommendations(self, temperature, light, moisture, moisture_status, role):
-        """Generate product recommendations based on sensor data and user role"""
+    def get_recommendations(self, temperature, light, moisture, moisture_status, role, age=None):
+        """Generate product recommendations based on sensor data, user role, and age"""
         
         if not self.client:
             return {
@@ -27,6 +27,24 @@ class OpenAIService:
             }
         
         try:
+            age_info = ""
+            if age:
+                age_info = f"\nAge: {age} years old"
+                if role == 'child':
+                    if age < 3:
+                        age_info += " (toddler - use gentle, tear-free products)"
+                    elif age < 12:
+                        age_info += " (child - use mild, safe products)"
+                    else:
+                        age_info += " (teenager - may need specialized products)"
+                elif role in ['mother', 'father']:
+                    if age < 30:
+                        age_info += " (young adult)"
+                    elif age < 50:
+                        age_info += " (adult)"
+                    else:
+                        age_info += " (mature - may need age-appropriate products)"
+            
             prompt = f"""Based on the following hair sensor data, provide personalized hair product recommendations:
 
 Sensor Readings:
@@ -35,20 +53,23 @@ Sensor Readings:
 - Moisture Level: {moisture}% (moisture reading)
 - Moisture Status: {moisture_status} (oily/dry/normal)
 
-User Role: {role} (mother/father/child)
+User Role: {role} (mother/father/child){age_info}
 
 Please provide:
-1. 3-5 specific product recommendations (shampoo, conditioner, treatments)
-2. Brief reasoning for each recommendation
-3. General hair care tips based on the readings
+1. 3-5 specific product recommendations (shampoo, conditioner, treatments) that are age-appropriate
+2. Brief reasoning for each recommendation, considering both sensor data and age
+3. General hair care tips based on the readings and age
 
-IMPORTANT: For each product recommendation, provide a clear, searchable product name that can be used to search on Amazon.
+IMPORTANT: 
+- For each product recommendation, provide a clear, searchable product name that can be used to search on Amazon.
+- Consider age-appropriate products (e.g., gentle products for children, age-specific treatments for adults)
+- Take into account that different ages may have different hair care needs
 
 Format your response as a JSON object with:
 - "recommendations": array of objects, each with:
   - "name": clear product name (e.g., "Clarifying Shampoo for Oily Hair", "Moisturizing Conditioner")
   - "type": product type (e.g., "shampoo", "conditioner", "treatment")
-  - "reason": brief explanation why this product is recommended
+  - "reason": brief explanation why this product is recommended (mention age if relevant)
 - "tips": array of general hair care tips
 - "reasoning": brief explanation of the analysis
 

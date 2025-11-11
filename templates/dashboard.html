@@ -35,7 +35,16 @@
 
         <!-- User Selection -->
         <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-            <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Who is combing?</h2>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800">Who is combing?</h2>
+                <button onclick="openAgeConfig()" class="px-3 sm:px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition text-sm sm:text-base flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Configure Ages
+                </button>
+            </div>
             <div class="flex flex-wrap gap-2 sm:gap-4">
                 <button onclick="selectUser('mother')" class="user-btn flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-medium text-sm sm:text-base">
                     Mother
@@ -133,10 +142,62 @@
                 <div class="text-gray-500 text-xs sm:text-sm">Ask me anything about hair health, monitoring, or the smart comb system!</div>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-2">
-                <input type="text" id="chatInput" placeholder="Type your question..." 
-                       class="flex-1 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="flex-1 flex items-center gap-2">
+                    <input type="text" id="chatInput" placeholder="Type your question or click mic to speak..." 
+                           class="flex-1 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="micButton" onclick="toggleVoiceInput()" 
+                            class="p-2 sm:p-2.5 bg-gray-200 hover:bg-gray-300 rounded-lg transition flex-shrink-0">
+                        <svg id="micIcon" class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                        </svg>
+                    </button>
+                </div>
                 <button onclick="sendMessage()" class="px-4 sm:px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm sm:text-base w-full sm:w-auto">
                     Send
+                </button>
+            </div>
+            <div id="voiceStatus" class="mt-2 text-xs sm:text-sm text-gray-500 hidden"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Age Configuration Modal -->
+<div id="ageConfigModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 sm:w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Configure Ages</h3>
+                <button onclick="closeAgeConfig()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Mother's Age</label>
+                    <input type="number" id="motherAge" min="1" max="120" 
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Father's Age</label>
+                    <input type="number" id="fatherAge" min="1" max="120" 
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Child's Age</label>
+                    <input type="number" id="childAge" min="1" max="120" 
+                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+            
+            <div class="flex gap-3 mt-6">
+                <button onclick="saveAges()" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+                    Save
+                </button>
+                <button onclick="closeAgeConfig()" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    Cancel
                 </button>
             </div>
         </div>
@@ -450,10 +511,198 @@ function getRecommendations() {
     });
 }
 
+// Voice recognition and text-to-speech
+let recognition = null;
+let isListening = false;
+let synth = window.speechSynthesis;
+
+// Initialize speech recognition
+function initSpeechRecognition() {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        
+        recognition.onstart = () => {
+            isListening = true;
+            updateMicButton(true);
+            updateVoiceStatus('Listening... Speak now', 'text-green-600');
+        };
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('chatInput').value = transcript;
+            updateVoiceStatus('Voice input received ✓', 'text-green-600');
+            setTimeout(() => {
+                updateVoiceStatus('');
+            }, 2000);
+        };
+        
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            isListening = false;
+            updateMicButton(false);
+            
+            let errorMessage = '';
+            let errorClass = 'text-red-600';
+            
+            switch(event.error) {
+                case 'not-allowed':
+                    errorMessage = 'Microphone permission denied. Please allow microphone access in your browser settings and try again.';
+                    break;
+                case 'no-speech':
+                    errorMessage = 'No speech detected. Please try again.';
+                    break;
+                case 'audio-capture':
+                    errorMessage = 'No microphone found. Please check your microphone connection.';
+                    break;
+                case 'network':
+                    errorMessage = 'Network error. Please check your internet connection.';
+                    break;
+                case 'aborted':
+                    errorMessage = 'Voice recognition aborted.';
+                    break;
+                default:
+                    errorMessage = `Error: ${event.error}. Please try again.`;
+            }
+            
+            updateVoiceStatus(errorMessage, errorClass);
+            
+            // Clear error message after 5 seconds
+            setTimeout(() => {
+                updateVoiceStatus('');
+            }, 5000);
+        };
+        
+        recognition.onend = () => {
+            isListening = false;
+            updateMicButton(false);
+            // Don't clear status if there was an error
+            const statusDiv = document.getElementById('voiceStatus');
+            if (!statusDiv.classList.contains('text-red-600')) {
+                updateVoiceStatus('');
+            }
+        };
+    } else {
+        console.warn('Speech recognition not supported');
+        updateVoiceStatus('Voice input not supported in this browser', 'text-yellow-600');
+    }
+}
+
+async function toggleVoiceInput() {
+    if (!recognition) {
+        initSpeechRecognition();
+        if (!recognition) return;
+    }
+    
+    if (isListening) {
+        recognition.stop();
+        return;
+    }
+    
+    // Request microphone permission first
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Permission granted, stop the stream and start recognition
+        stream.getTracks().forEach(track => track.stop());
+        
+        try {
+            recognition.start();
+        } catch (err) {
+            console.error('Error starting recognition:', err);
+            if (err.name === 'InvalidStateError') {
+                updateVoiceStatus('Voice recognition is already running', 'text-yellow-600');
+            } else {
+                updateVoiceStatus('Error starting voice input: ' + err.message, 'text-red-600');
+            }
+        }
+    } catch (err) {
+        console.error('Microphone permission error:', err);
+        let errorMsg = 'Microphone access denied. ';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMsg += 'Please click the microphone icon in your browser\'s address bar and allow microphone access, then try again.';
+        } else if (err.name === 'NotFoundError') {
+            errorMsg += 'No microphone found. Please connect a microphone and try again.';
+        } else {
+            errorMsg += 'Please check your browser settings and allow microphone access.';
+        }
+        updateVoiceStatus(errorMsg, 'text-red-600');
+        setTimeout(() => {
+            updateVoiceStatus('');
+        }, 8000);
+    }
+}
+
+function updateMicButton(listening) {
+    const micButton = document.getElementById('micButton');
+    const micIcon = document.getElementById('micIcon');
+    
+    if (listening) {
+        micButton.classList.remove('bg-gray-200');
+        micButton.classList.add('bg-red-500', 'animate-pulse');
+        micIcon.classList.remove('text-gray-700');
+        micIcon.classList.add('text-white');
+    } else {
+        micButton.classList.remove('bg-red-500', 'animate-pulse');
+        micButton.classList.add('bg-gray-200');
+        micIcon.classList.remove('text-white');
+        micIcon.classList.add('text-gray-700');
+    }
+}
+
+function updateVoiceStatus(message, textClass = 'text-gray-500') {
+    const statusDiv = document.getElementById('voiceStatus');
+    if (message) {
+        statusDiv.textContent = message;
+        statusDiv.className = `mt-2 text-xs sm:text-sm ${textClass}`;
+        statusDiv.classList.remove('hidden');
+    } else {
+        statusDiv.classList.add('hidden');
+    }
+}
+
+function speakText(text) {
+    if (synth.speaking) {
+        synth.cancel();
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    utterance.onstart = () => {
+        console.log('Speaking started');
+    };
+    
+    utterance.onend = () => {
+        console.log('Speaking ended');
+    };
+    
+    utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+    };
+    
+    synth.speak(utterance);
+}
+
+
+function stopSpeaking() {
+    if (synth.speaking) {
+        synth.cancel();
+    }
+}
+
 function sendMessage() {
     const input = document.getElementById('chatInput');
     const message = input.value.trim();
     if (!message) return;
+    
+    // Stop any ongoing speech
+    stopSpeaking();
     
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML += `<div class="mb-2 text-right"><span class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg">${message}</span></div>`;
@@ -469,7 +718,35 @@ function sendMessage() {
     })
     .then(res => res.json())
     .then(data => {
-        chatMessages.innerHTML += `<div class="mb-2"><span class="inline-block bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">${data.response}</span></div>`;
+        const responseId = 'response-' + Date.now();
+        const responseDiv = document.createElement('div');
+        responseDiv.className = 'mb-2';
+        responseDiv.id = responseId;
+        
+        // Create text node for safe text display
+        const textSpan = document.createElement('span');
+        textSpan.className = 'inline-block bg-gray-200 text-gray-800 px-4 py-2 rounded-lg flex-1';
+        textSpan.textContent = data.response;
+        
+        // Create speaker button
+        const button = document.createElement('button');
+        button.onclick = () => speakText(data.response);
+        button.className = 'p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition flex-shrink-0';
+        button.title = 'Speak response';
+        button.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+            </svg>
+        `;
+        
+        // Create container
+        const container = document.createElement('div');
+        container.className = 'flex items-start gap-2';
+        container.appendChild(textSpan);
+        container.appendChild(button);
+        
+        responseDiv.appendChild(container);
+        chatMessages.appendChild(responseDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     })
     .catch(err => {
@@ -482,6 +759,14 @@ document.getElementById('chatInput').addEventListener('keypress', (e) => {
         sendMessage();
     }
 });
+
+// Initialize speech recognition on page load
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    initSpeechRecognition();
+} else {
+    document.getElementById('micButton').style.display = 'none';
+    console.warn('Speech recognition not supported in this browser');
+}
 
 // Vibration motor state
 let vibrationMotorState = false;
@@ -572,6 +857,64 @@ fetch('/api/user-id')
         }
     })
     .catch(err => console.error('Error loading user ID:', err));
+
+// Age configuration functions
+function openAgeConfig() {
+    // Load current ages
+    fetch('/api/age-config')
+        .then(res => res.json())
+        .then(ages => {
+            document.getElementById('motherAge').value = ages.mother || '';
+            document.getElementById('fatherAge').value = ages.father || '';
+            document.getElementById('childAge').value = ages.child || '';
+            document.getElementById('ageConfigModal').classList.remove('hidden');
+        })
+        .catch(err => {
+            console.error('Error loading ages:', err);
+            document.getElementById('ageConfigModal').classList.remove('hidden');
+        });
+}
+
+function closeAgeConfig() {
+    document.getElementById('ageConfigModal').classList.add('hidden');
+}
+
+function saveAges() {
+    const ages = {
+        mother: document.getElementById('motherAge').value || null,
+        father: document.getElementById('fatherAge').value || null,
+        child: document.getElementById('childAge').value || null
+    };
+    
+    fetch('/api/age-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ages)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Ages saved successfully!');
+            closeAgeConfig();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to save ages'));
+        }
+    })
+    .catch(err => {
+        console.error('Error saving ages:', err);
+        alert('Error saving ages. Please try again.');
+    });
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', (e) => {
+    const modal = document.getElementById('ageConfigModal');
+    if (e.target === modal) {
+        closeAgeConfig();
+    }
+});
 
 // Debug function to check database
 function checkDebugData() {

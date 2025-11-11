@@ -139,6 +139,55 @@ def get_sensor_data():
     
     return jsonify(data)
 
+@app.route('/api/age-config', methods=['GET', 'POST'])
+def age_config():
+    """Get or save age configuration for roles"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    user_id = session['user_id']
+    
+    if request.method == 'GET':
+        # Get age configuration
+        config = mongo.db.user_settings.find_one({'user_id': user_id})
+        if config and 'ages' in config:
+            return jsonify(config['ages'])
+        return jsonify({'mother': None, 'father': None, 'child': None})
+    
+    elif request.method == 'POST':
+        # Save age configuration
+        data = request.get_json()
+        ages = {
+            'mother': data.get('mother'),
+            'father': data.get('father'),
+            'child': data.get('child')
+        }
+        
+        # Validate ages
+        for role, age in ages.items():
+            if age is not None:
+                try:
+                    age = int(age)
+                    if age < 1 or age > 120:
+                        return jsonify({'error': f'Invalid age for {role}. Age must be between 1 and 120.'}), 400
+                    ages[role] = age
+                except (ValueError, TypeError):
+                    return jsonify({'error': f'Invalid age for {role}. Please enter a valid number.'}), 400
+        
+        # Update or insert user settings
+        mongo.db.user_settings.update_one(
+            {'user_id': user_id},
+            {
+                '$set': {
+                    'ages': ages,
+                    'updated_at': datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
+        
+        return jsonify({'success': True, 'ages': ages})
+
 @app.route('/api/recommendations', methods=['POST'])
 def get_recommendations():
     if 'user_id' not in session:
@@ -156,19 +205,27 @@ def get_recommendations():
     if not latest_data:
         return jsonify({'error': 'No sensor data available'}), 404
     
+    # Get age configuration
+    user_settings = mongo.db.user_settings.find_one({'user_id': session['user_id']})
+    age = None
+    if user_settings and 'ages' in user_settings:
+        age = user_settings['ages'].get(role)
+    
     # Generate recommendations using OpenAI
     recommendations = openai_service.get_recommendations(
         temperature=latest_data.get('temperature', 0),
         light=latest_data.get('light', 0),
         moisture=latest_data.get('moisture', 0),
         moisture_status=latest_data.get('moisture_status', 'normal'),
-        role=role
+        role=role,
+        age=age
     )
     
     # Store recommendation
     recommendation_doc = {
         'user_id': session['user_id'],
         'role': role,
+        'age': age,
         'recommendations': recommendations,
         'sensor_data_id': str(latest_data['_id']),
         'created_at': datetime.utcnow()
