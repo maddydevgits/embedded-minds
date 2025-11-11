@@ -279,7 +279,7 @@ def set_role():
         return jsonify({'error': 'Invalid role. Must be mother, father, or child'}), 400
     
     try:
-        topic = app.config['MQTT_TOPIC'] + '/role'
+        topic = 'smartcomb/role'  # Match ESP32 subscription topic
         print(f"[API] Publishing role '{role}' to topic: {topic}")
         
         # Publish role to MQTT topic that ESP32 subscribes to
@@ -318,7 +318,7 @@ def control_vibration():
         return jsonify({'error': 'Invalid command. Must be on, off, 1, 0, true, or false'}), 400
     
     try:
-        topic = app.config['MQTT_TOPIC'] + '/vibration'
+        topic = 'smartcomb/vibration'  # Match ESP32 subscription topic
         
         # If turning on and intensity is provided, send intensity value
         if command in ['on', '1', 'true'] and intensity is not None:

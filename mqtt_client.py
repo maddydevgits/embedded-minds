@@ -41,13 +41,26 @@ class MQTTClient:
             
             # Process sensor data
             with self.app.app_context():
+                # Get raw values
+                light_raw = data.get('light', 0)
+                moisture_raw = data.get('moisture', 0)
+                
+                # Convert to percentages if needed (handle both raw ADC and percentage values)
+                light_value = self._convert_light_value(light_raw)
+                # For moisture, use the same inverted conversion logic
+                if moisture_raw > 100:
+                    moisture_value = ((4095.0 - moisture_raw) / 4095.0) * 100.0
+                else:
+                    moisture_value = moisture_raw
+                moisture_value = max(0, min(100, moisture_value))
+                
                 sensor_data = {
                     'user_id': data.get('user_id', 'anonymous'),
                     'role': data.get('role', 'user'),
                     'temperature': data.get('temperature', 0),
-                    'light': data.get('light', 0),
-                    'moisture': data.get('moisture', 0),
-                    'moisture_status': self._determine_moisture_status(data.get('moisture', 0)),
+                    'light': light_value,  # Store as percentage (0-100)
+                    'moisture': moisture_value,  # Store as percentage (0-100)
+                    'moisture_status': self._determine_moisture_status(moisture_raw),
                     'ir_sensor': data.get('ir', 0),
                     'timestamp': datetime.utcnow()
                 }
@@ -61,13 +74,17 @@ class MQTTClient:
     def _determine_moisture_status(self, moisture_value):
         """Determine moisture status based on analog value
         Note: moisture_value can be raw ADC (0-4095) or percentage (0-100)
-        If it's ADC, convert to percentage first
+        If it's ADC, convert to percentage first (inverted: 4095 = dry, 0 = wet)
         """
-        # If value is > 100, assume it's raw ADC and convert to percentage
+        # If value is > 100, assume it's raw ADC and convert to percentage (inverted)
         if moisture_value > 100:
-            moisture_percent = (moisture_value / 4095.0) * 100.0
+            # Inverted conversion: 4095 = dry (0%), 0 = wet (100%)
+            moisture_percent = ((4095.0 - moisture_value) / 4095.0) * 100.0
         else:
             moisture_percent = moisture_value
+        
+        # Clamp to 0-100 range
+        moisture_percent = max(0, min(100, moisture_percent))
         
         if moisture_percent < 30:
             return 'dry'
@@ -75,6 +92,21 @@ class MQTTClient:
             return 'oily'
         else:
             return 'normal'
+    
+    def _convert_light_value(self, light_value):
+        """Convert light sensor value to percentage
+        Note: light_value can be raw ADC (0-4095) or percentage (0-100)
+        If it's ADC, convert to percentage (inverted: 4095 = no light, 0 = full light)
+        """
+        # If value is > 100, assume it's raw ADC and convert to percentage (inverted)
+        if light_value > 100:
+            # Inverted conversion: 4095 = no light (0%), 0 = full light (100%)
+            light_percent = ((4095.0 - light_value) / 4095.0) * 100.0
+        else:
+            light_percent = light_value
+        
+        # Clamp to 0-100 range
+        return max(0, min(100, light_percent))
     
     def start(self):
         self.client = mqtt.Client()
