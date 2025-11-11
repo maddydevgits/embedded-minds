@@ -1,0 +1,136 @@
+from openai import OpenAI
+from flask import current_app
+
+class OpenAIService:
+    def __init__(self):
+        self.client = None
+        try:
+            from config import Config
+            api_key = Config.OPENAI_API_KEY
+            if api_key:
+                self.client = OpenAI(api_key=api_key)
+        except:
+            pass
+    
+    def get_recommendations(self, temperature, light, moisture, moisture_status, role):
+        """Generate product recommendations based on sensor data and user role"""
+        
+        if not self.client:
+            return {
+                'recommendations': [
+                    'Please configure OpenAI API key in environment variables',
+                    'For oily hair: Use clarifying shampoo',
+                    'For dry hair: Use moisturizing conditioner',
+                    'For dense hair: Use volumizing products'
+                ],
+                'reasoning': 'OpenAI API key not configured'
+            }
+        
+        try:
+            prompt = f"""Based on the following hair sensor data, provide personalized hair product recommendations:
+
+Sensor Readings:
+- Temperature: {temperature}°C (indicates scalp heat/irritation level)
+- Light Sensor: {light} (indicates hair density - higher values mean denser hair)
+- Moisture Level: {moisture}% (moisture reading)
+- Moisture Status: {moisture_status} (oily/dry/normal)
+
+User Role: {role} (mother/father/child)
+
+Please provide:
+1. 3-5 specific product recommendations (shampoo, conditioner, treatments)
+2. Brief reasoning for each recommendation
+3. General hair care tips based on the readings
+
+IMPORTANT: For each product recommendation, provide a clear, searchable product name that can be used to search on Amazon.
+
+Format your response as a JSON object with:
+- "recommendations": array of objects, each with:
+  - "name": clear product name (e.g., "Clarifying Shampoo for Oily Hair", "Moisturizing Conditioner")
+  - "type": product type (e.g., "shampoo", "conditioner", "treatment")
+  - "reason": brief explanation why this product is recommended
+- "tips": array of general hair care tips
+- "reasoning": brief explanation of the analysis
+
+Example format:
+{{
+  "recommendations": [
+    {{
+      "name": "Clarifying Shampoo for Oily Hair",
+      "type": "shampoo",
+      "reason": "Helps remove excess oil and buildup"
+    }}
+  ],
+  "tips": ["Wash hair every other day", "Use lukewarm water"],
+  "reasoning": "Based on high moisture readings indicating oily scalp"
+}}
+"""
+
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a hair care expert providing personalized product recommendations based on sensor data."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            result_text = response.choices[0].message.content
+            
+            # Try to parse as JSON, if not return as text
+            try:
+                import json
+                return json.loads(result_text)
+            except:
+                return {
+                    'recommendations': result_text.split('\n'),
+                    'reasoning': 'AI-generated recommendations based on sensor data'
+                }
+                
+        except Exception as e:
+            return {
+                'recommendations': [
+                    f'Error generating recommendations: {str(e)}',
+                    'For oily hair: Use clarifying shampoo',
+                    'For dry hair: Use moisturizing conditioner'
+                ],
+                'reasoning': 'Error occurred'
+            }
+    
+    def chat(self, message, sensor_data=None):
+        """Handle chatbot queries about hair health"""
+        
+        if not self.client:
+            return "I'm sorry, the AI service is not configured. Please set up your OpenAI API key."
+        
+        try:
+            context = ""
+            if sensor_data:
+                context = f"""
+Recent sensor readings:
+- Temperature: {sensor_data.get('temperature', 'N/A')}°C
+- Light (Density): {sensor_data.get('light', 'N/A')}
+- Moisture: {sensor_data.get('moisture_status', 'N/A')}
+"""
+            
+            prompt = f"""You are a helpful hair care assistant for a smart comb monitoring system. 
+{context}
+Answer the user's question about hair health, monitoring, or the smart comb system in a friendly and informative way.
+Keep responses concise and practical."""
+
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": message}
+                ],
+                max_tokens=300,
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            return f"I'm sorry, I encountered an error: {str(e)}. Please try again later."
+

@@ -1,0 +1,601 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Comb{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl sm:text-2xl font-bold text-indigo-600">Smart Comb</h1>
+                </div>
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <span class="text-gray-700 text-sm sm:text-base hidden sm:inline">Welcome, {{ session.username }}</span>
+                    <span class="text-gray-700 text-sm sm:hidden">{{ session.username }}</span>
+                    <a href="{{ url_for('logout') }}" class="text-indigo-600 hover:text-indigo-800 text-sm sm:text-base px-2 sm:px-0">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Vibration Motor Control -->
+        <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+            <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Vibration Motor Control</h2>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <button id="vibrationBtn" onclick="toggleVibration()" 
+                        class="px-6 sm:px-8 py-3 sm:py-4 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-semibold text-base sm:text-lg w-full sm:w-auto">
+                    <span id="vibrationStatus">OFF</span>
+                </button>
+                <p id="vibrationStatusText" class="text-gray-600 text-sm sm:text-base">Motor is currently OFF</p>
+            </div>
+        </div>
+
+        <!-- User Selection -->
+        <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+            <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Who is combing?</h2>
+            <div class="flex flex-wrap gap-2 sm:gap-4">
+                <button onclick="selectUser('mother')" class="user-btn flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-medium text-sm sm:text-base">
+                    Mother
+                </button>
+                <button onclick="selectUser('father')" class="user-btn flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-medium text-sm sm:text-base">
+                    Father
+                </button>
+                <button onclick="selectUser('child')" class="user-btn flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-3 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition font-medium text-sm sm:text-base">
+                    Child
+                </button>
+            </div>
+            <div class="mt-4 space-y-2">
+                <p id="selectedUser" class="text-gray-600 text-sm sm:text-base"></p>
+                <div id="roleStatus" class="text-xs sm:text-sm"></div>
+                <div class="text-xs sm:text-sm text-gray-500">
+                    <p class="break-all">Your User ID for MQTT: <span id="userIdDisplay" class="font-mono text-xs bg-gray-100 px-2 py-1 rounded break-all"></span></p>
+                    <p class="text-xs mt-1">Update this in your ESP32 code</p>
+                    <button onclick="checkDebugData()" class="mt-2 text-xs px-3 py-1.5 bg-gray-200 hover:bg-gray-300 rounded text-gray-700">
+                        Debug: Check Database
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <!-- Sensor Data Visualization -->
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Sensor Data</h2>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+                    <select id="timeRange" onchange="loadSensorData()" class="w-full sm:w-auto border border-gray-300 rounded-lg px-4 py-2 text-sm sm:text-base">
+                        <option value="100">Last 100 readings</option>
+                        <option value="50">Last 50 readings</option>
+                        <option value="20">Last 20 readings</option>
+                    </select>
+                </div>
+                <div class="overflow-x-auto">
+                    <canvas id="sensorChart" height="250" class="max-w-full"></canvas>
+                </div>
+            </div>
+
+            <!-- Current Sensor Readings -->
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Current Readings</h2>
+                <div class="space-y-3 sm:space-y-4">
+                    <div class="bg-blue-50 p-3 sm:p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-700 font-medium text-sm sm:text-base">Temperature</span>
+                            <span id="tempValue" class="text-xl sm:text-2xl font-bold text-blue-600">--°C</span>
+                        </div>
+                    </div>
+                    <div class="bg-yellow-50 p-3 sm:p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-700 font-medium text-sm sm:text-base">Light (Density)</span>
+                            <span id="lightValue" class="text-xl sm:text-2xl font-bold text-yellow-600">--</span>
+                        </div>
+                    </div>
+                    <div class="bg-green-50 p-3 sm:p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-700 font-medium text-sm sm:text-base">Moisture</span>
+                            <span id="moistureValue" class="text-xl sm:text-2xl font-bold text-green-600">--</span>
+                        </div>
+                        <p id="moistureStatus" class="text-xs sm:text-sm text-gray-600 mt-2"></p>
+                    </div>
+                    <div class="bg-purple-50 p-3 sm:p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-700 font-medium text-sm sm:text-base">Combing Status</span>
+                            <span id="combingStatus" class="text-base sm:text-lg font-semibold text-purple-600">Inactive</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mt-6">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-semibold text-gray-800">Product Recommendations</h2>
+                    <p class="text-xs sm:text-sm text-gray-500 mt-1">Click Amazon links to search for recommended products</p>
+                </div>
+                <button onclick="getRecommendations()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm sm:text-base w-full sm:w-auto">
+                    Get Recommendations
+                </button>
+            </div>
+            <div id="recommendations" class="mt-4">
+                <p class="text-gray-500">Select a user and click "Get Recommendations" to see personalized product suggestions.</p>
+            </div>
+        </div>
+
+        <!-- Chatbot -->
+        <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mt-6">
+            <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Hair Health Assistant</h2>
+            <div class="border border-gray-200 rounded-lg p-3 sm:p-4 h-48 sm:h-64 overflow-y-auto mb-4 bg-gray-50" id="chatMessages">
+                <div class="text-gray-500 text-xs sm:text-sm">Ask me anything about hair health, monitoring, or the smart comb system!</div>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-2">
+                <input type="text" id="chatInput" placeholder="Type your question..." 
+                       class="flex-1 border border-gray-300 rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="sendMessage()" class="px-4 sm:px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm sm:text-base w-full sm:w-auto">
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedRole = null;
+let sensorChart = null;
+let chartData = { labels: [], temperature: [], light: [], moisture: [] };
+
+function selectUser(role) {
+    selectedRole = role;
+    document.querySelectorAll('.user-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white');
+        btn.classList.add('bg-indigo-100', 'text-indigo-700');
+    });
+    event.target.classList.remove('bg-indigo-100', 'text-indigo-700');
+    event.target.classList.add('bg-indigo-600', 'text-white');
+    document.getElementById('selectedUser').textContent = `Selected: ${role.charAt(0).toUpperCase() + role.slice(1)}`;
+    
+    // Update status
+    const statusDiv = document.getElementById('roleStatus');
+    statusDiv.innerHTML = '<span class="text-yellow-600">Sending role to device...</span>';
+    
+    // Send role to ESP32 device via MQTT
+    fetch('/api/set-role', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: role })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Role sent to device:', data.role);
+            statusDiv.innerHTML = `<span class="text-green-600">✓ Role "${role}" sent to device. Waiting for sensor data...</span>`;
+            // Wait a moment for ESP32 to update, then load data
+            setTimeout(() => {
+                loadSensorData();
+            }, 1000);
+        } else {
+            console.error('Failed to send role:', data.error);
+            statusDiv.innerHTML = `<span class="text-red-600">✗ Failed to send role: ${data.error}</span>`;
+            loadSensorData(); // Still try to load existing data
+        }
+    })
+    .catch(err => {
+        console.error('Error sending role to device:', err);
+        statusDiv.innerHTML = `<span class="text-red-600">✗ Error: ${err.message}</span>`;
+        loadSensorData(); // Still try to load existing data
+    });
+}
+
+function loadSensorData() {
+    if (!selectedRole) {
+        alert('Please select a user first');
+        return;
+    }
+    
+    const limit = document.getElementById('timeRange').value;
+    const url = `/api/sensor-data?role=${selectedRole}&limit=${limit}`;
+    console.log('Loading sensor data from:', url);
+    
+    fetch(url)
+        .then(res => {
+            console.log('Response status:', res.status);
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log('Sensor data received:', data);
+            console.log('Data length:', data.length);
+            console.log('Selected role:', selectedRole);
+            
+            if (data && data.length > 0) {
+                // Check if data has the correct role
+                const firstDataRole = data[0].role;
+                console.log('First data item role:', firstDataRole);
+                
+                if (firstDataRole !== selectedRole) {
+                    console.warn(`Warning: Data role "${firstDataRole}" doesn't match selected role "${selectedRole}"`);
+                }
+                
+                updateChart(data);
+                updateCurrentReadings(data[0]);
+                
+                // Remove any "no data" messages
+                const chartContainer = document.getElementById('sensorChart').parentElement;
+                const noDataMsg = chartContainer.querySelector('.no-data-msg');
+                if (noDataMsg) {
+                    noDataMsg.remove();
+                }
+            } else {
+                console.warn('No sensor data found for role:', selectedRole);
+                // Show message to user
+                const chartContainer = document.getElementById('sensorChart').parentElement;
+                const existingMsg = chartContainer.querySelector('.no-data-msg');
+                if (!existingMsg) {
+                    const msg = document.createElement('p');
+                    msg.className = 'no-data-msg text-gray-500 text-center mt-4 p-4 bg-yellow-50 rounded-lg';
+                    msg.innerHTML = `
+                        <p class="font-semibold">No sensor data found for "${selectedRole}"</p>
+                        <p class="text-sm mt-2">Possible reasons:</p>
+                        <ul class="text-sm mt-1 list-disc list-inside">
+                            <li>ESP32 hasn't received the role update yet</li>
+                            <li>ESP32 is not connected or publishing data</li>
+                            <li>No combing detected (IR sensor not triggered)</li>
+                            <li>User ID mismatch between ESP32 and dashboard</li>
+                        </ul>
+                        <p class="text-xs mt-2 text-gray-400">Check Serial Monitor on ESP32 to verify role was received</p>
+                    `;
+                    chartContainer.appendChild(msg);
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Error loading sensor data:', err);
+            const chartContainer = document.getElementById('sensorChart').parentElement;
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'no-data-msg text-red-600 text-center mt-4 p-4 bg-red-50 rounded-lg';
+            errorMsg.textContent = `Error loading sensor data: ${err.message}`;
+            chartContainer.appendChild(errorMsg);
+        });
+}
+
+function updateChart(data) {
+    if (!data || data.length === 0) {
+        console.warn('No data to display in chart');
+        return;
+    }
+    
+    // Remove any existing "no data" message
+    const chartContainer = document.getElementById('sensorChart').parentElement;
+    const noDataMsg = chartContainer.querySelector('.no-data-msg');
+    if (noDataMsg) {
+        noDataMsg.remove();
+    }
+    
+    chartData.labels = data.map(d => {
+        try {
+            return new Date(d.timestamp).toLocaleTimeString();
+        } catch (e) {
+            return d.timestamp || 'N/A';
+        }
+    }).reverse();
+    chartData.temperature = data.map(d => parseFloat(d.temperature) || 0).reverse();
+    chartData.light = data.map(d => parseFloat(d.light) || 0).reverse();
+    chartData.moisture = data.map(d => parseFloat(d.moisture) || 0).reverse();
+
+    const ctx = document.getElementById('sensorChart').getContext('2d');
+    
+    if (sensorChart) {
+        sensorChart.destroy();
+    }
+    
+    sensorChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    label: 'Temperature (°C)',
+                    data: chartData.temperature,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Light (Density)',
+                    data: chartData.light,
+                    borderColor: 'rgb(234, 179, 8)',
+                    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                    tension: 0.4
+                },
+                {
+                    label: 'Moisture (%)',
+                    data: chartData.moisture,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            aspectRatio: window.innerWidth < 640 ? 1.5 : 2,
+            plugins: {
+                legend: {
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: window.innerWidth < 640 ? 10 : 12
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: {
+                            size: window.innerWidth < 640 ? 10 : 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: window.innerWidth < 640 ? 10 : 12
+                        },
+                        maxRotation: window.innerWidth < 640 ? 45 : 0,
+                        minRotation: window.innerWidth < 640 ? 45 : 0
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCurrentReadings(data) {
+    document.getElementById('tempValue').textContent = `${(data.temperature || 0).toFixed(1)}°C`;
+    document.getElementById('lightValue').textContent = (data.light || 0).toFixed(0);
+    document.getElementById('moistureValue').textContent = `${(data.moisture || 0).toFixed(1)}%`;
+    document.getElementById('moistureStatus').textContent = `Status: ${data.moisture_status || 'normal'}`;
+    document.getElementById('combingStatus').textContent = data.ir_sensor ? 'Active' : 'Inactive';
+}
+
+function getRecommendations() {
+    if (!selectedRole) {
+        alert('Please select a user first');
+        return;
+    }
+    
+    const recommendationsDiv = document.getElementById('recommendations');
+    recommendationsDiv.innerHTML = '<p class="text-gray-500">Loading recommendations...</p>';
+    
+    fetch('/api/recommendations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: selectedRole })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            recommendationsDiv.innerHTML = `<p class="text-red-600">${data.error}</p>`;
+            return;
+        }
+        
+        let html = '';
+        if (data.recommendations && Array.isArray(data.recommendations)) {
+            html = '<div class="space-y-3">';
+            data.recommendations.forEach(rec => {
+                if (typeof rec === 'string') {
+                    // Try to extract product name from string
+                    const productName = rec.replace(/^[-•]\s*/, '').split(/[:\n]/)[0].trim();
+                    const amazonUrl = generateAmazonSearchUrl(productName);
+                    html += `<div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <p class="text-gray-800 mb-2">${rec}</p>
+                        <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" 
+                           class="inline-flex items-center px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium rounded-lg transition">
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5z"/>
+                            </svg>
+                            Search on Amazon
+                        </a>
+                    </div>`;
+                } else if (rec.name) {
+                    const productName = rec.name;
+                    const amazonUrl = generateAmazonSearchUrl(productName);
+                    html += `<div class="bg-indigo-50 p-3 sm:p-4 rounded-lg border border-indigo-100">
+                        <h3 class="font-semibold text-indigo-800 mb-1 text-sm sm:text-base">${rec.name}</h3>
+                        ${rec.type ? `<p class="text-xs text-indigo-600 mb-2">${rec.type}</p>` : ''}
+                        <p class="text-xs sm:text-sm text-gray-600 mb-3">${rec.reason || ''}</p>
+                        <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" 
+                           class="inline-flex items-center justify-center px-3 sm:px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-semibold rounded-lg transition shadow-sm hover:shadow w-full sm:w-auto">
+                            <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5z"/>
+                            </svg>
+                            <span class="hidden sm:inline">Search "${productName}" on Amazon</span>
+                            <span class="sm:hidden">Search on Amazon</span>
+                        </a>
+                    </div>`;
+                }
+            });
+            html += '</div>';
+        } else if (data.recommendations) {
+            html = `<div class="bg-indigo-50 p-4 rounded-lg"><pre class="whitespace-pre-wrap text-gray-800">${data.recommendations}</pre></div>`;
+        }
+        
+        if (data.tips && Array.isArray(data.tips)) {
+            html += '<h3 class="font-semibold mt-4 mb-2">Tips:</h3><ul class="list-disc list-inside space-y-1">';
+            data.tips.forEach(tip => {
+                html += `<li class="text-gray-700">${tip}</li>`;
+            });
+            html += '</ul>';
+        }
+        
+        recommendationsDiv.innerHTML = html || '<p class="text-gray-500">No recommendations available</p>';
+    })
+    .catch(err => {
+        recommendationsDiv.innerHTML = `<p class="text-red-600">Error: ${err.message}</p>`;
+    });
+}
+
+function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const message = input.value.trim();
+    if (!message) return;
+    
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML += `<div class="mb-2 text-right"><span class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg">${message}</span></div>`;
+    input.value = '';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message })
+    })
+    .then(res => res.json())
+    .then(data => {
+        chatMessages.innerHTML += `<div class="mb-2"><span class="inline-block bg-gray-200 text-gray-800 px-4 py-2 rounded-lg">${data.response}</span></div>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    })
+    .catch(err => {
+        chatMessages.innerHTML += `<div class="mb-2"><span class="inline-block bg-red-100 text-red-800 px-4 py-2 rounded-lg">Error: ${err.message}</span></div>`;
+    });
+}
+
+document.getElementById('chatInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        sendMessage();
+    }
+});
+
+// Vibration motor state
+let vibrationMotorState = false;
+
+// Generate Amazon search URL
+function generateAmazonSearchUrl(productName) {
+    // URL encode the product name for Amazon search
+    const encodedName = encodeURIComponent(productName);
+    // You can change the domain based on your region (amazon.com, amazon.co.uk, amazon.in, etc.)
+    return `https://www.amazon.in/s?k=${encodedName}&ref=sr_pg_1`;
+}
+
+// Toggle vibration motor
+function toggleVibration() {
+    const newState = !vibrationMotorState;
+    const command = newState ? 'on' : 'off';
+    
+    const btn = document.getElementById('vibrationBtn');
+    const status = document.getElementById('vibrationStatus');
+    const statusText = document.getElementById('vibrationStatusText');
+    
+    // Update UI immediately for better UX
+    if (newState) {
+        btn.classList.remove('bg-gray-200', 'text-gray-800');
+        btn.classList.add('bg-green-500', 'text-white');
+        status.textContent = 'ON';
+        statusText.textContent = 'Motor is turning ON...';
+    } else {
+        btn.classList.remove('bg-green-500', 'text-white');
+        btn.classList.add('bg-gray-200', 'text-gray-800');
+        status.textContent = 'OFF';
+        statusText.textContent = 'Motor is turning OFF...';
+    }
+    
+    // Send command to ESP32
+    fetch('/api/vibration', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ command: command })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            vibrationMotorState = newState;
+            statusText.textContent = `Motor is ${newState ? 'ON' : 'OFF'}`;
+            console.log(`Vibration motor: ${command}`);
+        } else {
+            // Revert UI on error
+            vibrationMotorState = !newState;
+            if (vibrationMotorState) {
+                btn.classList.remove('bg-gray-200', 'text-gray-800');
+                btn.classList.add('bg-green-500', 'text-white');
+                status.textContent = 'ON';
+            } else {
+                btn.classList.remove('bg-green-500', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-800');
+                status.textContent = 'OFF';
+            }
+            statusText.textContent = `Error: ${data.error || 'Failed to control motor'}`;
+            console.error('Failed to control vibration motor:', data.error);
+        }
+    })
+    .catch(err => {
+        // Revert UI on error
+        vibrationMotorState = !newState;
+        if (vibrationMotorState) {
+            btn.classList.remove('bg-gray-200', 'text-gray-800');
+            btn.classList.add('bg-green-500', 'text-white');
+            status.textContent = 'ON';
+        } else {
+            btn.classList.remove('bg-green-500', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-800');
+            status.textContent = 'OFF';
+        }
+        statusText.textContent = `Error: ${err.message}`;
+        console.error('Error controlling vibration motor:', err);
+    });
+}
+
+// Load user ID on page load
+fetch('/api/user-id')
+    .then(res => res.json())
+    .then(data => {
+        if (data.user_id) {
+            document.getElementById('userIdDisplay').textContent = data.user_id;
+        }
+    })
+    .catch(err => console.error('Error loading user ID:', err));
+
+// Debug function to check database
+function checkDebugData() {
+    fetch('/api/debug-data')
+        .then(res => res.json())
+        .then(data => {
+            console.log('=== Database Debug Info ===');
+            console.log('Total records:', data.total_records);
+            console.log('Roles found:', data.roles_found);
+            console.log('Data by role:', data.data_by_role);
+            alert(`Found ${data.total_records} total records.\nRoles: ${data.roles_found.join(', ') || 'none'}\nCheck console for details.`);
+        })
+        .catch(err => {
+            console.error('Error checking debug data:', err);
+            alert('Error checking database. See console for details.');
+        });
+}
+
+// Auto-refresh sensor data every 5 seconds
+setInterval(() => {
+    if (selectedRole) {
+        loadSensorData();
+    }
+}, 5000);
+</script>
+{% endblock %}
+
