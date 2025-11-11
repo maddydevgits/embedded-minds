@@ -10,9 +10,18 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 flex flex-col min-h-screen">
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
+    
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="text-center text-sm text-gray-600">
+                <p>&copy; 2024 Team Embedded Minds. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>
 
